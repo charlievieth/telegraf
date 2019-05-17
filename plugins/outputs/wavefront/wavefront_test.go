@@ -1,13 +1,16 @@
 package wavefront
 
 import (
-	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/metric"
-	"github.com/influxdata/telegraf/testutil"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/metric"
+	"github.com/influxdata/telegraf/testutil"
+	"github.com/wavefronthq/wavefront-sdk-go/histogram"
+	wavefront "github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
 // default config used by Tests
@@ -321,13 +324,13 @@ var testString = "this_is*my!test/string\\for=replacement"
 
 func BenchmarkReplaceAllString(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		sanitizedRegex.ReplaceAllString(testString, "-")
+		sanitize(testString)
 	}
 }
 
 func BenchmarkReplaceAllLiteralString(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		sanitizedRegex.ReplaceAllLiteralString(testString, "-")
+		sanitize(testString)
 	}
 }
 
@@ -336,3 +339,64 @@ func BenchmarkReplacer(b *testing.B) {
 		sanitizedChars.Replace(testString)
 	}
 }
+
+func BenchmarkSend(b *testing.B) {
+	metrics := []telegraf.Metric{
+		testutil.TestMetric(float64(1), "testing_just*a%metric:float"),
+		testutil.TestMetric(float64(2), "testing_just*a%metric:float", "metric2"),
+		testutil.TestMetric(float64(3), "testing_just/another,metric:float", "metric2"),
+		testutil.TestMetric(float64(4), "testing_just/another,metric:float", "metric3"),
+	}
+	w := defaultWavefront()
+	w.sender = nopSender{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.Write(metrics)
+	}
+}
+
+// No-op Sender for benchmarking
+
+type nopSender struct{}
+
+var _ wavefront.Sender = nopSender{}
+
+// MetricSender
+func (nopSender) SendMetric(name string, value float64, ts int64, source string,
+	tags map[string]string) error {
+
+	return nil
+}
+
+// MetricSender
+func (nopSender) SendDeltaCounter(name string, value float64, source string,
+	tags map[string]string) error {
+
+	return nil
+}
+
+// DistributionSender
+func (nopSender) SendDistribution(name string, centroids []histogram.Centroid,
+	hgs map[histogram.Granularity]bool, ts int64, source string,
+	tags map[string]string) error {
+
+	return nil
+}
+
+// SpanSender
+func (nopSender) SendSpan(name string, startMillis, durationMillis int64,
+	source, traceId, spanId string,
+	parents, followsFrom []string, tags []wavefront.SpanTag,
+	spanLogs []wavefront.SpanLog) error {
+
+	return nil
+}
+
+// internal.Flusher
+func (nopSender) Flush() error           { return nil }
+func (nopSender) GetFailureCount() int64 { return 0 }
+func (nopSender) Start()                 {}
+
+// Sender
+func (nopSender) Close() {}
