@@ -341,18 +341,18 @@ func BenchmarkReplacer(b *testing.B) {
 }
 
 func BenchmarkSend(b *testing.B) {
-	metrics := []telegraf.Metric{
-		testutil.TestMetric(float64(1), "testing_just*a%metric:float"),
-		testutil.TestMetric(float64(2), "testing_just*a%metric:float", "metric2"),
-		testutil.TestMetric(float64(3), "testing_just/another,metric:float", "metric2"),
-		testutil.TestMetric(float64(4), "testing_just/another,metric:float", "metric3"),
+	var metrics = [...][]telegraf.Metric{
+		{testutil.TestMetric(float64(1), "testing_just*a%metric:float")},
+		{testutil.TestMetric(float64(2), "testing_just*a%metric:float", "metric2")},
+		{testutil.TestMetric(float64(3), "testing_just/another,metric:float", "metric2")},
+		{testutil.TestMetric(float64(4), "testing_just/another,metric:float", "metric3")},
 	}
 	w := defaultWavefront()
 	w.sender = nopSender{}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		w.Write(metrics)
+		w.Write(metrics[i%len(metrics)])
 	}
 }
 
